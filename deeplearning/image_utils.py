@@ -59,18 +59,25 @@ def image_from_url(url):
     Read an image from a URL. Returns a numpy array with the pixel data.
     We write the image to a temporary file then read it back. Kinda gross.
     """
+    fname = None
     try:
-        f = urllib.request.urlopen(url)
-        _, fname = tempfile.mkstemp()
-        with open(fname, 'wb') as ff:
-            ff.write(f.read())
+        with urllib.request.urlopen(url) as f:
+            _, fname = tempfile.mkstemp()
+            with open(fname, 'wb') as ff:
+                ff.write(f.read())
+
         img = skimage.io.imread(fname)
-        os.remove(fname)
-        return img
     except urllib.error.URLError as e:
-        print('URL Error: ', e.reason, url)
-    except urllib.error.HTTPError as e:
-        print('HTTP Error: ', e.code, url)
+        print('URL Error:', e.reason, url)
+        img = None
+    finally:
+        if fname:
+            try:
+                os.remove(fname)
+            except OSError as e:
+                print('Error deleting temporary file:', e, fname)
+
+    return img
 
 
 def load_image(filename, size=None):

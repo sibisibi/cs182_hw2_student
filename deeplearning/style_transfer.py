@@ -20,7 +20,7 @@ def content_loss(content_weight, content_current, content_target):
     ##############################################################################
     #                               YOUR CODE HERE                               #
     ##############################################################################
-    return None
+    return content_weight * ((content_current - content_target) ** 2).sum()
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -43,7 +43,15 @@ def gram_matrix(features, normalize=True):
     ##############################################################################
     #                               YOUR CODE HERE                               #
     ##############################################################################
-    return None
+    N, C, H, W = features.size()
+    features_flat = features.view(N, C, H*W)
+
+    gram = features_flat @ features_flat.transpose(1, 2)
+
+    if normalize:
+        gram /= H * W * C
+
+    return gram
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -72,7 +80,11 @@ def style_loss(feats, style_layers, style_targets, style_weights):
     ##############################################################################
     #                               YOUR CODE HERE                               #
     ##############################################################################
-    return None
+    style_loss = 0.0
+    for i, l in enumerate(style_layers):
+        style_current = gram_matrix(feats[l], normalize=True)
+        style_loss += style_weights[i] * ((style_current - style_targets[i]) ** 2).sum()
+    return style_loss
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################
@@ -94,7 +106,10 @@ def tv_loss(img, tv_weight):
     ##############################################################################
     #                               YOUR CODE HERE                               #
     ##############################################################################
-    return None
+    hdiff = img[:, :, :, 1:] - img[:, :, :, :-1]
+    vdiff = img[:, :, 1:, :] - img[:, :, :-1, :]
+    loss = tv_weight * ((hdiff ** 2).sum() + (vdiff ** 2).sum())
+    return loss
     ##############################################################################
     #                               END OF YOUR CODE                             #
     ##############################################################################

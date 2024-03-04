@@ -1,6 +1,7 @@
 from builtins import range
 from builtins import object
 import numpy as np
+import torch
 
 from deeplearning.layers import *
 from deeplearning.rnn_layers import *
@@ -137,7 +138,25 @@ class CaptioningRNN(object):
         # defined above to store loss and gradients; grads[k] should give the      #
         # gradients for self.params[k].                                            #
         ############################################################################
-        pass
+        h0 = features @ W_proj + b_proj
+
+        x, cache_embed = word_embedding_forward(captions_in, W_embed)
+        
+        forward = rnn_forward if self.cell_type == 'rnn' else lstm_forward
+        h, cache_rnn = forward(x, h0, Wx, Wh, b)
+  
+        out, cache_temporal = temporal_affine_forward(h, W_vocab, b_vocab)
+  
+        loss, dout = temporal_softmax_loss(out, captions_out, mask)
+
+        dh, grads['W_vocab'], grads['b_vocab'] = temporal_affine_backward(dout, cache_temporal)
+
+        backward = rnn_backward if self.cell_type == 'rnn' else lstm_backward
+        dx, dh0, grads['Wx'], grads['Wh'], grads['b'] = backward(dh, cache_rnn)
+
+        grads['W_embed'] = word_embedding_backward(dx, cache_embed)
+        grads['W_proj'] = features.T @ dh0
+        grads['b_proj'] = np.sum(dh0, axis=0)
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -199,7 +218,27 @@ class CaptioningRNN(object):
         # functions; you'll need to call rnn_step_forward or lstm_step_forward in #
         # a loop.                                                                 #
         ###########################################################################
-        pass
+        captions_in = np.full((N,), self._start)
+        prev_h = features @ W_proj + b_proj
+        if self.cell_type == 'lstm':
+            prev_c = np.zeros_like(prev_h)
+        
+        for t in range(max_length):
+            x, _ = word_embedding_forward(captions_in, W_embed)
+    
+            if self.cell_type == 'lstm':
+                next_h, next_c, _ = lstm_step_forward(x, prev_h, prev_c, Wx, Wh, b)
+            else:
+                next_h, _ = rnn_step_forward(x, prev_h, Wx, Wh, b)
+
+            out = next_h @ W_vocab + b_vocab
+            captions_out = np.argmax(out, axis=1)   
+
+            captions[:, t] = captions_out
+            captions_in = captions_out
+            prev_h = next_h
+            if self.cell_type == 'lstm':
+                prev_c = next_c 
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
